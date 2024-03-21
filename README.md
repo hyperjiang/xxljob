@@ -26,3 +26,43 @@ go version >= 1.16
 ```
 go get -u github.com/hyperjiang/xxljob
 ```
+
+## Usage
+
+### 1. Start the executor
+
+```go
+import "github.com/hyperjiang/xxljob"
+
+const (
+	appName     = "xxl-job-executor-sample"
+	accessToken = "default_token"
+	host        = "localhost:8080/xxl-job-admin"
+	demoHandler = "demoJobHandler"
+)
+
+e := xxljob.NewExecutor(
+    xxljob.WithAppName(appName),
+    xxljob.WithAccessToken(accessToken),
+    xxljob.WithHost(host),
+)
+
+// start in goroutine
+go e.Start()
+```
+### 2. Add job handler
+
+Job handlers are functions that implement `xxljob.JobHandler` (that is `func(ctx context.Context, param xxljob.JobParam) error`).
+
+```go
+e.AddJobHandler(demoHandler, func(ctx context.Context, param xxljob.JobParam) error {
+    fmt.Println(param.Params)
+    return nil
+})
+```
+
+### 3. Stop the executor
+
+```go
+e.Stop()
+```

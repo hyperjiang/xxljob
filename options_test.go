@@ -15,7 +15,7 @@ func TestOptions(t *testing.T) {
 
 	// default options
 	opts := xxljob.NewOptions()
-	should.Empty(opts.AccessToken)
+	should.Equal("default_token", opts.AccessToken)
 	should.Equal(1024, opts.CallbackBufferSize)
 	should.Equal("1s", opts.CallbackInterval)
 	should.Equal(time.Second*3, opts.ClientTimeout)

@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	defaultAccessToken        = "default_token"
 	defaultCallbackBufferSize = 1024
 	defaultCallbackInterval   = "1s"
 	defaultClientTimeout      = time.Second * 3
@@ -52,6 +53,7 @@ type Options struct {
 // NewOptions creates options with defaults
 func NewOptions(opts ...Option) Options {
 	var options = Options{
+		AccessToken:        defaultAccessToken,
 		CallbackBufferSize: defaultCallbackBufferSize,
 		CallbackInterval:   defaultCallbackInterval,
 		ClientTimeout:      defaultClientTimeout,
