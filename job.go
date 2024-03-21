@@ -45,6 +45,10 @@ type JobHandler func(ctx context.Context, param JobParam) error
 
 // Run runs the job.
 func (j *Job) Run() {
+	if j.ctx == nil {
+		j.ctx = context.Background()
+	}
+
 	if j.Timeout > 0 {
 		j.ctx, j.cancel = context.WithTimeout(j.ctx, time.Duration(j.Timeout)*time.Second)
 	} else {

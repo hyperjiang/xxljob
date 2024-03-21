@@ -45,7 +45,7 @@ type Executor struct {
 }
 
 // NewExecutor creates a new executor.
-func NewExecutor(opts ...Option) (*Executor, error) {
+func NewExecutor(opts ...Option) *Executor {
 	e := &Executor{
 		Options: NewOptions(opts...),
 	}
@@ -74,16 +74,16 @@ func NewExecutor(opts ...Option) (*Executor, error) {
 		WriteTimeout: e.WriteTimeout,
 	}
 
-	// Send result notifications to Ljob server periodically.
+	// Send result notifications to xxl-job server periodically.
 	e.callbackChan = make(chan CallbackParam, e.CallbackBufferSize)
-	e.notifier = scheduler.New("ljob_callback", e.notifyResult, e.CallbackInterval)
+	e.notifier = scheduler.New("xxljob_callback", e.notifyResult, e.CallbackInterval)
 	e.notifier.Start()
 
-	// ljob server does not check executor's health, so we need to register periodically in order to keep alive.
-	e.registrar = scheduler.New("ljob_register", e.register, e.RegisterInterval)
+	// xxl-job server does not check executor's health, so we need to register periodically in order to keep alive.
+	e.registrar = scheduler.New("xxljob_register", e.register, e.RegisterInterval)
 	e.registrar.Start()
 
-	return e, nil
+	return e
 }
 
 // post conduct a post request and parse the response.
@@ -130,7 +130,7 @@ func (e *Executor) deregister() error {
 	return err
 }
 
-// callback reports job execution status to ljob server.
+// callback reports job execution status to xxl-job server.
 func (e *Executor) callback(callbacks []CallbackParam) error {
 	var res Response
 	err := e.post("/api/callback", callbacks, &res)
@@ -141,7 +141,7 @@ func (e *Executor) callback(callbacks []CallbackParam) error {
 	return err
 }
 
-// notifyResult sends job execution results to Ljob server asynchronously.
+// notifyResult sends job execution results to xxl-job server asynchronously.
 func (e *Executor) notifyResult() error {
 	var callbacks []CallbackParam
 
@@ -160,7 +160,7 @@ func (e *Executor) notifyResult() error {
 	}
 }
 
-// Start starts the executor and register itself to the ljob server.
+// Start starts the executor and register itself to the xxl-job server.
 func (e *Executor) Start() error {
 	if err := e.register(); err != nil {
 		return err
@@ -381,16 +381,16 @@ func (e *Executor) parseParam(r *http.Request, param interface{}) error {
 	return json.Unmarshal(body, param)
 }
 
-// beat is for ljob server to check the executor's health.
+// beat is for xxl-job server to check the executor's health.
 func (e *Executor) beat(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
-	e.Logger.Info(logPrefix + "ljob beat")
+	e.Logger.Info(logPrefix + "beat")
 
 	fmt.Fprintln(w, NewSuccResponse().String())
 }
 
-// idleBeat is for ljob server to check if the job is idle.
+// idleBeat is for xxl-job server to check if the job is idle.
 func (e *Executor) idleBeat(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
@@ -410,7 +410,7 @@ func (e *Executor) idleBeat(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, NewSuccResponse().String())
 }
 
-// trigger is for ljob server to trigger a job execution.
+// trigger is for xxl-job server to trigger a job execution.
 func (e *Executor) trigger(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
@@ -431,7 +431,7 @@ func (e *Executor) trigger(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, NewSuccResponse().String())
 }
 
-// kill is for ljob server to terminate a running job.
+// kill is for xxl-job server to terminate a running job.
 func (e *Executor) kill(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
@@ -450,7 +450,7 @@ func (e *Executor) kill(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, NewSuccResponse().String())
 }
 
-// log is for ljob server to retrieve job execution logs.
+// log is for xxl-job server to retrieve job execution logs.
 // Because we do not write any logs locally, we directly return a dummy response here.
 func (e *Executor) log(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)

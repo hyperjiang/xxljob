@@ -10,11 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	appName = "xxl-job-executor-sample"
-	host    = "localhost:8088"
-)
-
 func TestOptions(t *testing.T) {
 	should := require.New(t)
 
