@@ -9,13 +9,30 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test
+        ports:
+          - 3306:3306
+        volumes:
+          - ./xxl-job-admin:/docker-entrypoint-initdb.d
+      xxl-job-admin:
+        image: xuxueli/xxl-job-admin:2.4.0
+        ports:
+          - 8080:8080
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&useSSL=false
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
     strategy:
       # Fail fast is disabled because there are Go version specific features and tests
       # that should be able to fail independently.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
         go: ['1.16', '1.17', '1.18', '1.19', '1.20', '1.21', '1.22']
 
     steps:
@@ -29,15 +46,9 @@ jobs:
 
       - name: Test
         run: go test -race -coverprofile=coverage.txt -covermode=atomic
-        if: runner.os != 'Windows'
-
-      - name: Test Windows
-        run: go test -race
-        if: runner.os == 'Windows'
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
-        if: runner.os != 'Windows'
 
   lint:
     name: Lint

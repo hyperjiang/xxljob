@@ -206,7 +206,7 @@ func (e *Executor) Stop() error {
 		return true
 	})
 
-	close(e.callbackChan)
+	// close(e.callbackChan)
 	e.notifier.Stop()
 
 	return nil

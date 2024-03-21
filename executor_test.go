@@ -16,7 +16,7 @@ import (
 const (
 	appName     = "xxl-job-executor-sample"
 	accessToken = "default_token"
-	host        = "localhost:8088/xxl-job-admin"
+	host        = "localhost:8080/xxl-job-admin"
 	demoHandler = "demoJobHandler"
 )
 
@@ -36,6 +36,7 @@ func TestExecutorTestSuite(t *testing.T) {
 
 // SetupSuite run once at the very start of the testing suite, before any tests are run.
 func (ts *ExecutorTestSuite) SetupSuite() {
+	should := require.New(ts.T())
 	ts.e = xxljob.NewExecutor(
 		xxljob.WithAppName(appName),
 		xxljob.WithAccessToken(accessToken),
@@ -64,7 +65,10 @@ func (ts *ExecutorTestSuite) SetupSuite() {
 		return nil
 	})
 
-	go ts.e.Start()
+	go func() {
+		err := ts.e.Start()
+		should.NoError(err)
+	}()
 
 	// wait for server start
 	time.Sleep(time.Second)
@@ -75,7 +79,7 @@ func (ts *ExecutorTestSuite) TearDownSuite() {
 	time.Sleep(time.Second)
 	ts.e.RemoveJobHandler(demoHandler)
 	ts.e.RemoveJobHandler("delayHandler")
-	ts.e.Stop()
+	_ = ts.e.Stop()
 }
 
 func (ts *ExecutorTestSuite) TestHappyPath() {
@@ -87,19 +91,22 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	should.NoError(err)
 
 	var res xxljob.Response
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 
 	req := xxljob.IdleBeatParam{JobID: 1}
 	resp, err = cli.R().SetBody(req).Post("idleBeat")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 
 	req2 := xxljob.LogParam{LogId: 1}
 	resp, err = cli.R().SetBody(req2).Post("log")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 
 	req3 := xxljob.RunParam{
@@ -111,7 +118,8 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	}
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 
 	// try to trigger a unexisting job handler, should fail
@@ -123,7 +131,8 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	}
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(500, res.Code)
 
 	req3 = xxljob.RunParam{
@@ -135,13 +144,15 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	}
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 
 	// duplicate log id
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(500, res.Code)
 
 	// the job is still running, this request is discarded
@@ -149,7 +160,8 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	req3.LogID = 3
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(500, res.Code)
 
 	// terminate the running worker and clear the worker queue,
@@ -158,7 +170,8 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	req3.LogID = 4
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 	// time.Sleep(time.Second) // wait for context timeout
 
@@ -167,14 +180,16 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	req3.ExecutorTimeout = 10
 	resp, err = cli.R().SetBody(req3).Post("run")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 
 	// the job is running (not idle)
 	req = xxljob.IdleBeatParam{JobID: 2}
 	resp, err = cli.R().SetBody(req).Post("idleBeat")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(500, res.Code)
 	fmt.Println(res.Msg)
 
@@ -183,7 +198,8 @@ func (ts *ExecutorTestSuite) TestHappyPath() {
 	}
 	resp, err = cli.R().SetBody(req4).Post("kill")
 	should.NoError(err)
-	json.Unmarshal(resp.Body(), &res)
+	err = json.Unmarshal(resp.Body(), &res)
+	should.NoError(err)
 	should.Equal(200, res.Code)
 }
 
@@ -198,7 +214,8 @@ func (ts *ExecutorTestSuite) TestInvalidRequest() {
 	for _, ep := range endpoints {
 		resp, err := cli.R().SetBody("invalid input").Post(ep)
 		should.NoError(err)
-		json.Unmarshal(resp.Body(), &res)
+		err = json.Unmarshal(resp.Body(), &res)
+		should.NoError(err)
 		should.Equal(500, res.Code)
 	}
 }
