@@ -198,7 +198,7 @@ func (e *Executor) Start() error {
 // Stop stops the executor.
 func (e *Executor) Stop() error {
 	e.registrar.Stop()
-	e.deregister()
+	_ = e.deregister()
 
 	e.jobs.Range(func(k interface{}, v interface{}) bool {
 		job := v.(*Job)

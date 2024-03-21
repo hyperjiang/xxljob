@@ -1,5 +1,11 @@
 # xxljob
 
+[![GoDoc](https://pkg.go.dev/badge/github.com/hyperjiang/xxljob)](https://pkg.go.dev/github.com/hyperjiang/xxljob)
+[![CI](https://github.com/hyperjiang/xxljob/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hyperjiang/xxljob/actions/workflows/ci.yml)
+[![](https://goreportcard.com/badge/github.com/hyperjiang/xxljob)](https://goreportcard.com/report/github.com/hyperjiang/xxljob)
+[![codecov](https://codecov.io/gh/hyperjiang/xxljob/branch/main/graph/badge.svg)](https://codecov.io/gh/hyperjiang/xxljob)
+[![Release](https://img.shields.io/github/release/hyperjiang/xxljob.svg)](https://github.com/hyperjiang/xxljob/releases)
+
 XXL-JOB golang executor is a standalone http server which manages the connection with XXL-JOB server.
 
 The default port is 9999. It registers itself as a node in XXL-JOB server, listens and handles the calls from XXL-JOB server.
