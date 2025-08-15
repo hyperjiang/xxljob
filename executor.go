@@ -132,10 +132,28 @@ func (e *Executor) deregister() error {
 
 // callback reports job execution status to xxl-job server.
 func (e *Executor) callback(callbacks []CallbackParam) error {
-	var res Response
-	err := e.post("/api/callback", callbacks, &res)
-	if err != nil {
-		e.Logger.Error(logPrefix+"callback failed: %v", err)
+	if len(callbacks) == 0 {
+		return nil
+	}
+
+	const (
+		maxRetries = 3
+		baseDelay  = 200 * time.Millisecond
+	)
+
+	var (
+		res Response
+		err error
+	)
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err = e.post("/api/callback", callbacks, &res)
+		if err == nil {
+			return nil
+		}
+
+		e.Logger.Error(logPrefix+"callback transient error (attempt=%d/%d): %v", attempt+1, maxRetries, err)
+		time.Sleep(time.Duration(attempt+1) * baseDelay)
 	}
 
 	return err
@@ -145,19 +163,25 @@ func (e *Executor) callback(callbacks []CallbackParam) error {
 func (e *Executor) notifyResult() error {
 	var callbacks []CallbackParam
 
-	if len(e.callbackChan) == 0 {
-		return nil
-	}
-
+Drain:
 	for {
 		select {
-		case cb := <-e.callbackChan:
+		case cb, ok := <-e.callbackChan:
+			if !ok { // channel is closed
+				break Drain
+			}
 			callbacks = append(callbacks, cb)
 		default:
 			// No more data to receive.
-			return e.callback(callbacks)
+			break Drain
 		}
 	}
+
+	if len(callbacks) == 0 {
+		return nil
+	}
+
+	return e.callback(callbacks)
 }
 
 // Start starts the executor and register itself to the xxl-job server.
