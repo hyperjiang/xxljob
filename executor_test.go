@@ -42,6 +42,9 @@ func (ts *ExecutorTestSuite) SetupSuite() {
 		xxljob.WithAccessToken(accessToken),
 		xxljob.WithClientTimeout(time.Second),
 		xxljob.WithHost(host),
+		xxljob.WithLogRetentionDays(1),
+		xxljob.WithLogCleanupInterval("1s"),
+		xxljob.WithLogDir("/tmp/xxl-job/jobhandler"),
 	)
 
 	ts.e.AddJobHandler(demoHandler, func(ctx context.Context, param xxljob.JobParam) error {
