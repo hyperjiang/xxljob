@@ -14,6 +14,9 @@ const (
 	defaultClientTimeout      = time.Second * 3
 	defaultRegisterInterval   = "10s"
 	defaultSizeLimit          = 10240
+	defaultLogDir             = "/tmp/xxl-job/jobhandler"
+	defaultLogRetentionDays   = 7
+	defaultLogCleanupInterval = "24h"
 
 	defaultPort        = 9999
 	defaultIdleTimeout = time.Second * 60
@@ -37,6 +40,9 @@ type Options struct {
 	CallbackInterval   string
 	ClientTimeout      time.Duration
 	Host               string
+	LogDir             string
+	LogRetentionDays   int
+	LogCleanupInterval string
 	Logger             Logger
 	RegisterInterval   string
 	SizeLimit          int64 // we will not log the response if its size exceeds the size limit
@@ -57,6 +63,9 @@ func NewOptions(opts ...Option) Options {
 		CallbackBufferSize: defaultCallbackBufferSize,
 		CallbackInterval:   defaultCallbackInterval,
 		ClientTimeout:      defaultClientTimeout,
+		LogDir:             defaultLogDir,
+		LogRetentionDays:   defaultLogRetentionDays,
+		LogCleanupInterval: defaultLogCleanupInterval,
 		Logger:             DefaultLogger(),
 		RegisterInterval:   defaultRegisterInterval,
 		SizeLimit:          defaultSizeLimit,
@@ -124,10 +133,33 @@ func WithHost(host string) Option {
 	}
 }
 
+// WithLogDir sets log directory for job handlers.
+func WithLogDir(dir string) Option {
+	return func(o *Options) {
+		o.LogDir = dir
+	}
+}
+
 // WithLogger sets logger.
 func WithLogger(logger Logger) Option {
 	return func(o *Options) {
 		o.Logger = logger
+	}
+}
+
+// WithLogRetentionDays sets how many days to keep log files.
+func WithLogRetentionDays(days int) Option {
+	return func(o *Options) {
+		if days > 0 {
+			o.LogRetentionDays = days
+		}
+	}
+}
+
+// WithLogCleanupInterval sets how often to run log cleanup.
+func WithLogCleanupInterval(interval string) Option {
+	return func(o *Options) {
+		o.LogCleanupInterval = interval
 	}
 }
 

@@ -2,6 +2,9 @@ package xxljob
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -19,14 +22,16 @@ const (
 
 // Job represents a scheduled job.
 type Job struct {
-	ID        int
-	LogID     int64
-	Name      string
-	Handle    JobHandler
-	Param     JobParam
-	Timeout   int // timeout in seconds
-	StartTime time.Time
-	EndTime   time.Time
+	ID          int
+	LogID       int64
+	LogDateTime int64
+	Name        string
+	Handle      JobHandler
+	Param       JobParam
+	Timeout     int // timeout in seconds
+	StartTime   time.Time
+	EndTime     time.Time
+	LogDir      string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -55,8 +60,39 @@ func (j *Job) Run() {
 		j.ctx, j.cancel = context.WithCancel(j.ctx)
 	}
 
+	var jobLogger *fileLogger
+
+	// Prepare log file if LogDir is configured.
+	if j.LogDir != "" {
+		logDate := time.Unix(j.LogDateTime/1000, 0)
+		logDir := filepath.Join(j.LogDir, logDate.Format("2006-01-02"))
+		if err := os.MkdirAll(logDir, 0755); err == nil {
+			logFile := filepath.Join(logDir, fmt.Sprintf("%d.log", j.LogID))
+			if f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				logger := &fileLogger{file: f}
+				jobLogger = logger
+				j.ctx = ContextWithLogger(j.ctx, logger)
+				defer logger.Close()
+			}
+		}
+	}
+
 	j.StartTime = time.Now()
-	j.done <- j.Handle(j.ctx, j.Param)
+	if jobLogger != nil {
+		jobLogger.Info("job start: id=%d logId=%d handler=%s params=%s", j.ID, j.LogID, j.Name, j.Param.Params)
+	}
+
+	err := j.Handle(j.ctx, j.Param)
+
+	if jobLogger != nil {
+		if err != nil {
+			jobLogger.Error("job failed: %v", err)
+		} else {
+			jobLogger.Info("job success")
+		}
+	}
+
+	j.done <- err
 }
 
 // Stop stops the job.

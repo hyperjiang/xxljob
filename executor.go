@@ -4,6 +4,7 @@
 package xxljob
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,6 +45,7 @@ type Executor struct {
 	callbackChan chan CallbackParam
 	notifier     *scheduler.Scheduler
 	registrar    *scheduler.Scheduler
+	cleaner      *scheduler.Scheduler
 }
 
 // NewExecutor creates a new executor.
@@ -78,6 +82,10 @@ func NewExecutor(opts ...Option) *Executor {
 	e.callbackChan = make(chan CallbackParam, e.CallbackBufferSize)
 	e.notifier = scheduler.New("xxljob_callback", e.notifyResult, e.CallbackInterval)
 	e.notifier.Start()
+
+	// Periodically clean old log files.
+	e.cleaner = scheduler.New("xxljob_log_cleanup", e.cleanupLogs, e.LogCleanupInterval)
+	e.cleaner.Start()
 
 	// xxl-job server does not check executor's health, so we need to register periodically in order to keep alive.
 	e.registrar = scheduler.New("xxljob_register", e.register, e.RegisterInterval)
@@ -184,6 +192,45 @@ Drain:
 	return e.callback(callbacks)
 }
 
+// cleanupLogs removes expired log folders based on retention days.
+func (e *Executor) cleanupLogs() error {
+	if e.LogDir == "" || e.LogRetentionDays <= 0 {
+		return nil
+	}
+
+	cutoff := time.Now().Add(-time.Duration(e.LogRetentionDays) * 24 * time.Hour)
+	cutoffDate := time.Date(cutoff.Year(), cutoff.Month(), cutoff.Day(), 0, 0, 0, 0, cutoff.Location())
+
+	entries, err := os.ReadDir(e.LogDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		date, err := time.Parse("2006-01-02", name)
+		if err != nil {
+			continue
+		}
+
+		if date.Before(cutoffDate) {
+			path := filepath.Join(e.LogDir, name)
+			if rmErr := os.RemoveAll(path); rmErr != nil {
+				e.Logger.Error(logPrefix+"cleanup log dir failed: %v", rmErr)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Start starts the executor and register itself to the xxl-job server.
 func (e *Executor) Start() error {
 	if err := e.register(); err != nil {
@@ -232,6 +279,9 @@ func (e *Executor) Stop() error {
 
 	// close(e.callbackChan)
 	e.notifier.Stop()
+	if e.cleaner != nil {
+		e.cleaner.Stop()
+	}
 
 	return nil
 }
@@ -330,13 +380,15 @@ func (e *Executor) newJob(params RunParam) (*Job, error) {
 	}
 
 	job := &Job{
-		ID:      params.JobID,
-		LogID:   params.LogID,
-		Name:    params.ExecutorHandler,
-		Handle:  handler,
-		Param:   param,
-		Timeout: params.ExecutorTimeout,
-		done:    make(chan error, 1),
+		ID:          params.JobID,
+		LogID:       params.LogID,
+		LogDateTime: params.LogDateTime,
+		Name:        params.ExecutorHandler,
+		Handle:      handler,
+		Param:       param,
+		Timeout:     params.ExecutorTimeout,
+		LogDir:      e.LogDir,
+		done:        make(chan error, 1),
 	}
 
 	go e.watch(job)
@@ -475,7 +527,6 @@ func (e *Executor) kill(w http.ResponseWriter, r *http.Request) {
 }
 
 // log is for xxl-job server to retrieve job execution logs.
-// Because we do not write any logs locally, we directly return a dummy response here.
 func (e *Executor) log(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
@@ -485,11 +536,48 @@ func (e *Executor) log(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logContent := ""
+	toLineNum := param.FromLineNum
+	isEnd := true
+
+	if e.LogDir != "" {
+		logDate := time.Unix(param.LogDateTime/1000, 0)
+		logFile := filepath.Join(e.LogDir, logDate.Format("2006-01-02"), fmt.Sprintf("%d.log", param.LogId))
+
+		if f, err := os.Open(logFile); err == nil {
+			defer f.Close()
+			scanner := bufio.NewScanner(f)
+			var builder strings.Builder
+			line := 1
+			for scanner.Scan() {
+				if line >= param.FromLineNum {
+					builder.WriteString(scanner.Text())
+					builder.WriteByte('\n')
+				}
+				line++
+			}
+			logContent = builder.String()
+			toLineNum = line
+		}
+
+		// If job still running, mark IsEnd false so admin keeps polling.
+		e.jobs.Range(func(_, v interface{}) bool {
+			job := v.(*Job)
+			if job.LogID == param.LogId {
+				isEnd = false
+				return false
+			}
+			return true
+		})
+	} else {
+		logContent = "log directory not configured"
+	}
+
 	content := &LogResult{
-		FromLineNum: 1,
-		ToLineNum:   2,
-		LogContent:  "N/A",
-		IsEnd:       true,
+		FromLineNum: param.FromLineNum,
+		ToLineNum:   toLineNum,
+		LogContent:  logContent,
+		IsEnd:       isEnd,
 	}
 
 	res := NewSuccResponse()
