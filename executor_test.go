@@ -49,6 +49,8 @@ func (ts *ExecutorTestSuite) SetupSuite() {
 
 	ts.e.AddJobHandler(demoHandler, func(ctx context.Context, param xxljob.JobParam) error {
 		fmt.Println(param.Params)
+		logger := xxljob.LoggerFromContext(ctx)
+		logger.Info("Job executed with params: %s", param.Params)
 		return nil
 	})
 

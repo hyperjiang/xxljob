@@ -48,6 +48,15 @@ func ContextWithLogger(ctx context.Context, logger Logger) context.Context {
 	return context.WithValue(ctx, jobLoggerKey, logger)
 }
 
+// LoggerFromContext retrieves the logger from context.
+// Returns a default logger if not found.
+func LoggerFromContext(ctx context.Context) Logger {
+	if logger, ok := ctx.Value(jobLoggerKey).(Logger); ok {
+		return logger
+	}
+	return DefaultLogger()
+}
+
 type fileLogger struct {
 	file *os.File
 }
